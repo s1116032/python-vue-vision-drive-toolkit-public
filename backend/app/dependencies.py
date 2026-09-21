@@ -26,7 +26,6 @@ async def get_current_user(
     if email is None:
         raise credentials_exception
 
-    # 查詢資料庫
     result = await db.execute(select(User).where(User.email == email))
     user = result.scalars().first()
 

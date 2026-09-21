@@ -33,6 +33,9 @@
             <span class="text-truncate me-2 text-primary flex-grow-1" style="cursor: pointer;" @click="openModal(img)">
               📄 {{ img.filename }}
             </span>
+            <!-- 加入標記狀態 Badge -->
+            <span v-if="img.is_annotated" class="badge bg-success ms-2">已標記 ({{ img.annotation_count }})</span>
+            <span v-else class="badge bg-warning text-dark ms-2">未標記</span>
           </li>
         </ul>
       </div>
@@ -100,10 +103,20 @@ const toggleSelectAll = () => {
 const handleTrain = async () => {
   if (selectedIds.value.length === 0) return;
   
+  // 檢查是否包含未標記的圖片
+  const selectedImages = images.value.filter(img => selectedIds.value.includes(img.id));
+  const unannotatedCount = selectedImages.filter(img => !img.is_annotated).length;
+  
+  if (unannotatedCount > 0) {
+    if (!confirm(`您選取的圖片中有 ${unannotatedCount} 張「未標記」，這些圖片將不會產生 YOLO 標籤檔。確定要繼續嗎？`)) {
+      return;
+    }
+  }
+  
   submitting.value = true;
   try {
     await createTask(selectedIds.value);
-    alert('任務已送出，正在背景訓練中！即將為您跳轉至任務列表...');
+    alert('任務已送出，正在背景轉換 YOLO 格式並打包！即將為您跳轉至任務列表...');
     router.push('/tasks');
   } catch (err) {
     alert('提交失敗: ' + (err.response?.data?.detail || '未知錯誤'));

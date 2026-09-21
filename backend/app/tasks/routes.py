@@ -21,7 +21,7 @@ async def create_task(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    # 1. 驗證傳入的 image_ids 是否都存在，且都屬於當前使用者 (防呆與資安檢查)
+    # 驗證傳入的 image_ids 是否都存在，且都屬於當前使用者 (防呆與資安檢查)
     if not task_data.image_ids:
         raise HTTPException(status_code=400, detail="請至少選擇一張圖片進行訓練")
 
@@ -35,17 +35,12 @@ async def create_task(
     if len(valid_images) != len(task_data.image_ids):
         raise HTTPException(status_code=400, detail="包含無效或無權限的圖片 ID")
 
-    # 2. 建立任務紀錄
-    new_task = Task(
-        user_id=current_user.id,
-        status="processing",  # 一進入背景任務就標記為處理中
-    )
+    new_task = Task(user_id=current_user.id, status="processing")
     db.add(new_task)
     await db.commit()
     await db.refresh(new_task)
 
-    # 3. 將耗時任務丟入背景執行 (不阻塞當前 API 回傳)
-    background_tasks.add_task(process_training_task, new_task.id)
+    background_tasks.add_task(process_training_task, new_task.id, task_data.image_ids)
 
     return new_task
 
@@ -70,7 +65,7 @@ async def download_model(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    # 1. 檢查任務是否存在且屬於該使用者
+    # 檢查任務是否存在且屬於該使用者
     result = await db.execute(
         select(Task).where(Task.id == task_id, Task.user_id == current_user.id)
     )
@@ -79,20 +74,24 @@ async def download_model(
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
 
-    # 2. 檢查任務是否已完成
+    # 檢查任務是否已完成
     if task.status != "completed" or not task.model_path:
         raise HTTPException(
             status_code=400, detail="Model is not ready yet or training failed."
         )
 
-    # 3. 準備檔案路徑
     file_path = os.path.join(settings.MODELS_DIR, task.model_path)
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="Model file not found on server")
 
-    # 4. 回傳檔案 (瀏覽器會自動觸發下載)
+    download_filename = (
+        task.model_path
+        if task.model_path.endswith(".zip")
+        else f"dataset_{task_id}.zip"
+    )
+
     return FileResponse(
         path=file_path,
-        filename="self_driving_model.txt",
-        media_type="application/octet-stream",
+        filename=download_filename,
+        media_type="application/zip",  # 告訴瀏覽器這是一個 ZIP 檔
     )

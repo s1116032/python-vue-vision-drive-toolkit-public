@@ -8,10 +8,16 @@ import filetype
 
 from ..database import get_db
 from ..models import User, Image
-from ..schemas import ImageResponse
+from ..schemas import (
+    ImageResponse,
+    AnnotationsUpdate,
+    AnnotationsResponse,
+    CategoryTreeItem,
+)
 from ..dependencies import get_current_user
 from ..auth.utils import decode_token
 from ..config import settings
+from ..categories import CATEGORY_TREE
 
 router = APIRouter()
 
@@ -26,7 +32,7 @@ async def upload_files(
 
     for file in files:
         # ==========================================
-        # 1. 安全驗證：讀取檔案開頭檢查 Magic Numbers
+        # 安全驗證：讀取檔案開頭檢查 Magic Numbers
         # ==========================================
         # 讀取前 2048 bytes 足以判斷絕大多數的圖片與影片格式
         header = await file.read(2048)
@@ -42,7 +48,7 @@ async def upload_files(
 
         real_mime_type = kind.mime
         # ==========================================
-        # 2. 根據「真實的 MIME Type」決定處理邏輯
+        # 根據「真實的 MIME Type」決定處理邏輯
         if real_mime_type.startswith("image/"):
             file_ext = os.path.splitext(file.filename)[1] or f".{kind.extension}"
             unique_filename = f"{uuid.uuid4()}{file_ext}"
@@ -128,7 +134,21 @@ async def get_images(
         .order_by(Image.created_at.desc())
     )
     images = result.scalars().all()
-    return images
+
+    # 組裝回傳資料，計算 annotation_count
+    response_data = []
+    for img in images:
+        ann_count = len(img.annotations) if img.annotations else 0
+        response_data.append(
+            ImageResponse(
+                id=img.id,
+                filename=img.filename,
+                created_at=img.created_at,
+                is_annotated=img.is_annotated,
+                annotation_count=ann_count,
+            )
+        )
+    return response_data
 
 
 @router.get("/{id}/file")
@@ -185,3 +205,50 @@ async def delete_image(
     await db.delete(image)
     await db.commit()
     return None
+
+
+@router.get("/categories", response_model=list[CategoryTreeItem])
+async def get_categories():
+    return CATEGORY_TREE
+
+
+@router.get("/{id}/annotations", response_model=AnnotationsResponse)
+async def get_annotations(
+    id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    result = await db.execute(
+        select(Image).where(Image.id == id, Image.user_id == current_user.id)
+    )
+    image = result.scalars().first()
+    if not image:
+        raise HTTPException(status_code=404, detail="Image not found or access denied")
+
+    return {"annotations": image.annotations if image.annotations else []}
+
+
+@router.post("/{id}/annotations", response_model=AnnotationsResponse)
+async def update_annotations(
+    id: int,
+    data: AnnotationsUpdate,  # 這裡會自動觸發 Pydantic 的座標驗證 (0~1)
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    result = await db.execute(
+        select(Image).where(Image.id == id, Image.user_id == current_user.id)
+    )
+    image = result.scalars().first()
+    if not image:
+        raise HTTPException(status_code=404, detail="Image not found or access denied")
+
+    # 將 Pydantic 模型轉換為 dict 陣列存入 JSON 欄位
+    image.annotations = [ann.model_dump() for ann in data.annotations]
+
+    # 根據標記數量自動更新 is_annotated 狀態
+    image.is_annotated = len(image.annotations) > 0
+
+    await db.commit()
+    await db.refresh(image)
+
+    return {"annotations": image.annotations}

@@ -70,11 +70,16 @@ const fetchTasks = async () => {
 const handleDownload = async (task) => {
   try {
     const res = await downloadModel(task.id);
-    // 將 Blob 轉換為可供瀏覽器下載的 URL
+    
+    // 將回傳的 Blob 資料轉換為 URL
     const url = window.URL.createObjectURL(new Blob([res.data]));
     const link = document.createElement('a');
     link.href = url;
-    link.setAttribute('download', 'self_driving_model.txt'); // 設定預設下載檔名
+    
+    // 【關鍵修正】：不再寫死 .txt，改為動態生成 .zip 檔名
+    const filename = `dataset_task_${task.id}.zip`; 
+    link.setAttribute('download', filename); 
+    
     document.body.appendChild(link);
     link.click();
     link.remove();

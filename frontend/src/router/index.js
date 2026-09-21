@@ -6,6 +6,7 @@ const Register = () => import('../views/Register.vue');
 const Dashboard = () => import('../views/Dashboard.vue');
 const Train = () => import('../views/Train.vue');
 const Tasks = () => import('../views/Tasks.vue');
+const Annotate = () => import('../views/Annotate.vue');
 
 const routes = [
   {
@@ -39,6 +40,15 @@ const routes = [
     name: 'Tasks',
     component: Tasks,
     meta: { requiresAuth: true }
+  },
+  {
+    path: '/annotate',
+    name: 'Annotate',
+    component: Annotate,
+    meta: { requiresAuth: true, 
+            hideNavbar: true, 
+            fullscreen: true
+    }
   }
 ];
 

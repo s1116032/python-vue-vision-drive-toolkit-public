@@ -1,4 +1,12 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey
+from sqlalchemy import (
+    Column,
+    Integer,
+    String,
+    Boolean,
+    DateTime,
+    ForeignKey,
+    JSON,
+)
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from .database import Base
@@ -26,6 +34,10 @@ class Image(Base):
     filename = Column(String, nullable=False)
     filepath = Column(String, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+    # 儲存標記陣列，例如：[{"id": "uuid", "category_id": 0, "type": "bbox", "x": 0.1, ...}]
+    annotations = Column(JSON, default=list)
+    is_annotated = Column(Boolean, default=False)
 
     owner = relationship("User", back_populates="images")
 

@@ -8,7 +8,7 @@
           <div v-if="error" class="alert alert-danger">{{ error }}</div>
           
           <!-- 如果網址列帶有 ?verified=true，顯示成功提示 -->
-          <div v-if="$route.query.verified" class="alert alert-success">
+          <div v-if="route.query.verified" class="alert alert-success">
             Email 驗證成功！請登入。
           </div>
 
@@ -53,9 +53,7 @@ const handleLogin = async () => {
   error.value = '';
   try {
     const res = await loginUser(email.value, password.value);
-    // 儲存 Token
     localStorage.setItem('access_token', res.data.access_token);
-    // 跳轉到 Dashboard
     router.push('/dashboard');
   } catch (err) {
     error.value = err.response?.data?.detail || '登入失敗，請檢查帳密或是否已驗證 Email';

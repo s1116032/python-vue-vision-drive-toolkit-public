@@ -18,3 +18,15 @@ export const getImages = () => {
 export const deleteImage = (id) => {
   return apiClient.delete(`/images/${id}`);
 };
+
+export const getCategories = () => {
+  return apiClient.get('/images/categories');
+};
+
+export const getAnnotations = (imageId) => {
+  return apiClient.get(`/images/${imageId}/annotations`);
+};
+
+export const updateAnnotations = (imageId, annotations) => {
+  return apiClient.post(`/images/${imageId}/annotations`, { annotations });
+};
