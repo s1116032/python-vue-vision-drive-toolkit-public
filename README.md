@@ -15,6 +15,20 @@
 
 由於開發時間有限，本專案以 **MVP (最小可行性產品)** 的形式快速實作，旨在打通從「帳號管理、資料處理、影像標註到模型訓練排程」的完整端到端流程，並刻意在架構上採用了現代化的工程實踐，以確保系統的健壯性與擴展性。
 
+## 📸 系統畫面展示 (UI Preview)
+
+### 1. 圖片管理儀表板 (Dashboard)
+提供清晰的批次選取介面與即時的標註狀態追蹤（已標記/未標記），並針對現代寬螢幕優化了全寬置中排版。
+<p align="center">
+  <img src="./assets/dashboard.png" alt="Dashboard UI" width="850">
+</p>
+
+### 2. 專注模式標註畫布 (Annotation Workspace)
+採用無干擾的全螢幕設計 (Focus Mode)，基於 SVG 實現像素級精準的 BBox 與 Polygon 繪製。右側整合了 Sticky Category 面板。
+<p align="center">
+  <img src="./assets/annotate.png" alt="Annotation Workspace" width="850">
+</p>
+
 ---
 
 ## 🌟 核心技術亮點 (Engineering Highlights)
