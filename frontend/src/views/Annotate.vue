@@ -133,6 +133,7 @@ import { getImages, getAnnotations, updateAnnotations, getCategories } from '../
 const route = useRoute();
 const router = useRouter();
 
+// --- 狀態變數 ---
 const imageIds = ref([]);
 const currentIndex = ref(0);
 const imgSrc = ref('');
@@ -156,13 +157,13 @@ const tempBox = ref(null);
 const tempPoints = ref([]);
 const mousePos = ref(null);
 
+// --- 生命週期與事件監聽 ---
 const handleResize = () => {
   if (imgRef.value) onImageLoad();
 };
 
 onMounted(async () => {
   window.addEventListener('resize', handleResize);
-  
   window.addEventListener('keydown', handleKeydown);
 
   const catRes = await getCategories();
@@ -189,9 +190,7 @@ const handleKeydown = (e) => {
   if (e.key === 'Escape') {
     cancelCurrentDrawing();
   } else if (e.key === 'Delete' || e.key === 'Backspace') {
-    if (selectedAnnId.value) {
-      deleteAnnotation(selectedAnnId.value);
-    }
+    if (selectedAnnId.value) deleteAnnotation(selectedAnnId.value);
   }
 };
 
@@ -199,7 +198,8 @@ const handleKeydown = (e) => {
 const loadImageAndAnnotations = async () => {
   loadingImg.value = true;
   imgError.value = false;
-  cancelCurrentDrawing(); // 切換圖片時清空暫存狀態
+  cancelCurrentDrawing();
+  selectedAnnId.value = null; // 切換圖片時清空選取狀態
   
   const currentId = imageIds.value[currentIndex.value];
   const token = localStorage.getItem('access_token');
@@ -207,7 +207,6 @@ const loadImageAndAnnotations = async () => {
   
   const annRes = await getAnnotations(currentId);
   annotations.value = annRes.data.annotations;
-  selectedAnnId.value = null;
 };
 
 const onImageLoad = () => {
@@ -229,18 +228,14 @@ const getNormCoords = (e) => {
   const rect = svgRef.value.getBoundingClientRect();
   let x = (e.clientX - rect.left) / rect.width;
   let y = (e.clientY - rect.top) / rect.height;
-  
-  return {
-    x: Math.max(0, Math.min(1, x)),
-    y: Math.max(0, Math.min(1, y))
-  };
-
+  return { x: Math.max(0, Math.min(1, x)), y: Math.max(0, Math.min(1, y)) };
 };
 
 // --- 工具切換 ---
 const switchTool = (tool) => {
-  cancelCurrentDrawing(); // 切換工具時取消正在畫的圖
+  cancelCurrentDrawing();
   currentTool.value = tool;
+  selectedAnnId.value = null; // 【修正】切換工具時順便取消選取
 };
 
 const cancelCurrentDrawing = () => {
@@ -252,7 +247,11 @@ const cancelCurrentDrawing = () => {
 
 // --- SVG 滑鼠事件 ---
 const onSvgMouseDown = (e) => {
-  if (e.target.style.cursor === 'pointer') return;
+  // 如果點到已存在的標記 (cursor: pointer 或 g 標籤內的元素)，不觸發繪製，也不取消選取
+  if (e.target.style.cursor === 'pointer' || e.target.closest('g')) return;
+
+  // 【修正 1】：點到空白處時，取消目前的選取狀態，避免焦點殘留
+  selectedAnnId.value = null;
 
   const pos = getNormCoords(e);
 
@@ -265,7 +264,7 @@ const onSvgMouseDown = (e) => {
     if (tempPoints.value.length >= 3) {
       const firstPoint = tempPoints.value[0];
       const distance = Math.hypot(pos.x - firstPoint.x, pos.y - firstPoint.y);
-      if (distance < 0.02) { // 歸一化距離小於 0.02 視為點擊到起點
+      if (distance < 0.02) {
         finishPolygon();
         return;
       }
@@ -276,7 +275,7 @@ const onSvgMouseDown = (e) => {
 
 const onSvgMouseMove = (e) => {
   const pos = getNormCoords(e);
-  mousePos.value = pos; 
+  mousePos.value = pos;
 
   if (isDrawing.value && tempBox.value) {
     const x = Math.min(startPoint.value.x, pos.x);
@@ -301,26 +300,32 @@ const onSvgMouseUp = () => {
   }
 };
 
+// --- 標記 CRUD ---
 const finishPolygon = () => {
   if (tempPoints.value.length >= 3) {
     addAnnotation({
       type: 'polygon',
-      points: tempPoints.value.map(p => [p.x, p.y]) // 轉為後端需要的 [[x,y], [x,y]] 格式
+      points: tempPoints.value.map(p => [p.x, p.y])
     });
   }
   tempPoints.value = [];
   mousePos.value = null;
 };
 
-// --- 標記 CRUD ---
+// 【修正 2】：新增標記後，自動選取這個新標記
 const addAnnotation = (data) => {
   const cat = categories.value.find(c => c.id === selectedCategoryId.value);
+  const newId = uuidv4();
+  
   annotations.value.push({
-    id: uuidv4(),
+    id: newId,
     category_id: cat.id,
     category_name: cat.name,
     ...data
   });
+  
+  // 自動將焦點轉移到剛畫好的新框，並同步右側類別選單
+  selectedAnnId.value = newId;
 };
 
 const selectAnnotation = (ann) => {
